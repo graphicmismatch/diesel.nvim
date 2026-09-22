@@ -35,24 +35,33 @@ local function register_grammar()
   end
 
   if not config.options.treesitter.auto_install then return end
-
-  -- Who installs the parser is genuinely racy. nvim-treesitter's own
-  -- `auto_install` has a FileType handler, but whether it runs before or after
-  -- this registration depends on load order - and when this plugin is
-  -- lazy-loaded on `ft = "diesel"`, theirs has already run and skipped
-  -- (no diesel parser was registered yet). So this plugin takes
-  -- responsibility, once per session, after a pause long enough for a
-  -- concurrent install to have finished and written the parser.
+  if requested then return end
   requested = true
-  vim.defer_fn(function()
-    if #vim.api.nvim_get_runtime_file("parser/diesel.so", false) > 0 then return end
-    local ok_install, ts_install = pcall(require, "nvim-treesitter.install")
-    if ok_install and ts_install.ensure_installed then
-      ts_install.ensure_installed "diesel"
-    else
-      pcall(vim.cmd, "TSInstall diesel")
+
+  -- Claim the parser: nvim-treesitter's own `auto_install` skips anything in
+  -- its ignore list, and that list is the live table its config holds. Without
+  -- this both sides install - neither has an in-progress guard, so they race,
+  -- compile the same grammar twice, and the loser fails on `mv`. Which of them
+  -- fires first depends on plugin load order, so claiming it is the only
+  -- deterministic option.
+  --
+  -- The ignore list only gates `ensure_installed`-style installs; the runner
+  -- used below (and :TSInstall / :TSUpdate diesel) still works on it.
+  local ok_configs, ts_configs = pcall(require, "nvim-treesitter.configs")
+  if ok_configs and ts_configs.get_ignored_parser_installs then
+    local ignored = ts_configs.get_ignored_parser_installs()
+    if type(ignored) == "table" and not vim.tbl_contains(ignored, "diesel") then
+      table.insert(ignored, "diesel")
     end
-  end, 3000)
+  end
+
+  if #vim.api.nvim_get_runtime_file("parser/diesel.so", false) > 0 then return end
+  local ok_install, ts_install = pcall(require, "nvim-treesitter.install")
+  if ok_install and ts_install.commands and ts_install.commands.TSInstall then
+    ts_install.commands.TSInstall.run "diesel"
+  else
+    pcall(vim.cmd, "TSInstall diesel")
+  end
 end
 
 local function start_server(bufnr)
