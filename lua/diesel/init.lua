@@ -20,37 +20,39 @@ local function register_grammar()
   if not ok then return end
 
   local configs = parsers.get_parser_configs and parsers.get_parser_configs() or parsers
-  if configs.diesel then return end
-  configs.diesel = {
-    install_info = {
-      url = config.grammar_source(),
-      files = { "src/parser.c" },
-      branch = config.options.treesitter.branch,
-      generate_requires_npm = false,
-      requires_generate_from_grammar = false,
-    },
-    filetype = "diesel",
-  }
+  if requested then return end
+  if not configs.diesel then
+    configs.diesel = {
+      install_info = {
+        url = config.grammar_source(),
+        files = { "src/parser.c" },
+        branch = config.options.treesitter.branch,
+        generate_requires_npm = false,
+        requires_generate_from_grammar = false,
+      },
+      filetype = "diesel",
+    }
+  end
 
   if not config.options.treesitter.auto_install then return end
 
-  -- nvim-treesitter installs parsers itself when its own `auto_install` is on;
-  -- it creates this augroup when it does. Asking as well means two compiles of
-  -- the same grammar racing each other, and the loser fails noisily on `mv`.
-  if vim.fn.exists "#NvimTreesitter-auto_install#FileType" == 1 then return end
-
-  vim.schedule(function()
-    if requested or #vim.api.nvim_get_runtime_file("parser/diesel.so", false) > 0 then return end
-    requested = true
-    -- The Lua API rather than :TSInstall, which only exists once
-    -- nvim-treesitter's plugin files have been sourced.
+  -- Who installs the parser is genuinely racy. nvim-treesitter's own
+  -- `auto_install` has a FileType handler, but whether it runs before or after
+  -- this registration depends on load order - and when this plugin is
+  -- lazy-loaded on `ft = "diesel"`, theirs has already run and skipped
+  -- (no diesel parser was registered yet). So this plugin takes
+  -- responsibility, once per session, after a pause long enough for a
+  -- concurrent install to have finished and written the parser.
+  requested = true
+  vim.defer_fn(function()
+    if #vim.api.nvim_get_runtime_file("parser/diesel.so", false) > 0 then return end
     local ok_install, ts_install = pcall(require, "nvim-treesitter.install")
     if ok_install and ts_install.ensure_installed then
       ts_install.ensure_installed "diesel"
     else
       pcall(vim.cmd, "TSInstall diesel")
     end
-  end)
+  end, 3000)
 end
 
 local function start_server(bufnr)
