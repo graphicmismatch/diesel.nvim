@@ -1,0 +1,65 @@
+*diesel.txt*  Diesel (.dsl) support for Neovim: tree-sitter grammar and LSP
+
+==============================================================================
+CONTENTS                                                      *diesel-contents*
+
+  1. Introduction ............................. |diesel-introduction|
+  2. Requirements ............................. |diesel-requirements|
+  3. Setup .................................... |diesel-setup|
+  4. Commands ................................. |diesel-commands|
+  5. Features ................................. |diesel-features|
+
+==============================================================================
+1. INTRODUCTION                                           *diesel-introduction*
+
+Diesel is the C-like text patch format of the Petroleum synthesizer, written to
+files with a `.dsl` extension. This plugin wires up two separate projects:
+
+  diesel-treesitter   the grammar, compiled by nvim-treesitter
+  diesel-lsp          the language server, plain Node with no dependencies
+
+Both are cloned from GitHub the first time a `.dsl` file is opened.
+
+==============================================================================
+2. REQUIREMENTS                                           *diesel-requirements*
+
+  - Neovim 0.10 or newer
+  - node 18+ and git on $PATH
+  - a C compiler, for the grammar
+  - nvim-treesitter, for highlighting
+
+Run `:checkhealth diesel` to verify all of it.
+
+==============================================================================
+3. SETUP                                                         *diesel-setup*
+
+>lua
+    require("diesel").setup()
+<
+See |diesel-config| in the README for every option. The two that matter most:
+
+    lsp.path          use a local checkout instead of cloning
+    treesitter.path   use a local checkout instead of cloning
+
+==============================================================================
+4. COMMANDS                                                   *diesel-commands*
+
+                                                              *:DieselInstall*
+:DieselInstall      Clone the language server.
+
+                                                               *:DieselUpdate*
+:DieselUpdate       Pull the server, update the parser, restart clients.
+
+                                                                 *:DieselInfo*
+:DieselInfo         Print where the server, parser and node binary live.
+
+==============================================================================
+5. FEATURES                                                   *diesel-features*
+
+Diagnostics, completion (node types, ports after a dot, port values and fields
+in a node body), hover, go-to-definition, document symbols and rename, all over
+standard LSP - so your existing mappings and completion engine apply.
+
+Syntax highlighting, folds and locals come from the tree-sitter grammar.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
