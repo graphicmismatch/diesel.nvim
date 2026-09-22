@@ -32,18 +32,25 @@ local function register_grammar()
     filetype = "diesel",
   }
 
-  if config.options.treesitter.auto_install then
-    -- nvim-treesitter's own auto_install may or may not have a FileType
-    -- handler, and if it does it may run before this one (plugin load order is
-    -- not ours to control), in which case it saw no diesel parser and skipped.
-    -- Ask for the parser ourselves, once per session, if it is still missing.
-    vim.schedule(function()
-      if not requested and #vim.api.nvim_get_runtime_file("parser/diesel.so", false) == 0 then
-        requested = true
-        pcall(vim.cmd, "TSInstall diesel")
-      end
-    end)
-  end
+  if not config.options.treesitter.auto_install then return end
+
+  -- nvim-treesitter installs parsers itself when its own `auto_install` is on;
+  -- it creates this augroup when it does. Asking as well means two compiles of
+  -- the same grammar racing each other, and the loser fails noisily on `mv`.
+  if vim.fn.exists "#NvimTreesitter-auto_install#FileType" == 1 then return end
+
+  vim.schedule(function()
+    if requested or #vim.api.nvim_get_runtime_file("parser/diesel.so", false) > 0 then return end
+    requested = true
+    -- The Lua API rather than :TSInstall, which only exists once
+    -- nvim-treesitter's plugin files have been sourced.
+    local ok_install, ts_install = pcall(require, "nvim-treesitter.install")
+    if ok_install and ts_install.ensure_installed then
+      ts_install.ensure_installed "diesel"
+    else
+      pcall(vim.cmd, "TSInstall diesel")
+    end
+  end)
 end
 
 local function start_server(bufnr)
